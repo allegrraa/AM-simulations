@@ -4,3 +4,6 @@ __pycache__/
 .venv/
 .env
 *.log
+backend/uploads/
+.pytest_cache/
+*.pyc

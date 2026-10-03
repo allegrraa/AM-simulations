@@ -23,6 +23,7 @@ class ScanService:
             "source": source,
             "images": [],
             "images_received": 0,
+            "reconstruction_type": None,
             "point_cloud_id": None,
             "mesh_id": None,
             "warnings": [],
@@ -56,6 +57,7 @@ class ScanService:
         scan["progress"] = 0.75
         result = ReconstructionService().reconstruct(project_id, scan_id, scan["images"])
         scan["status"] = result["status"]
+        scan["reconstruction_type"] = result["reconstruction_type"]
         scan["warnings"] = result["warnings"]
         scan["point_cloud_id"] = result["point_cloud_id"]
         scan["mesh_id"] = result["mesh_id"]

@@ -7,5 +7,6 @@ numpy==2.2.0
 scipy==1.14.1
 trimesh==4.5.1
 open3d==0.18.0
+opencv-python-headless==4.10.0.84
 httpx==0.28.1
 pytest==8.3.4

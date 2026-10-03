@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import cv2
+import numpy as np
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
@@ -82,6 +84,17 @@ def test_design_upload_and_geometry_metadata():
     assert payload["geometry_metadata"]["face_count"] > 0
 
 
+def make_sample_image(width=120, height=120, intensity=180):
+    img = np.zeros((height, width, 3), dtype=np.uint8)
+    img[:, :, 0] = intensity
+    img[:, :, 1] = intensity - 20
+    img[:, :, 2] = intensity + 30
+    cv2.circle(img, (width // 2, height // 2), width // 4, (255, 255, 255), -1)
+    ok, buffer = cv2.imencode(".png", img)
+    assert ok
+    return buffer.tobytes()
+
+
 def test_scan_workflow_and_mock_reconstruction():
     project = client.post("/projects", json={"name": "Scan Test"}).json()
     project_id = project["project_id"]
@@ -90,17 +103,19 @@ def test_scan_workflow_and_mock_reconstruction():
     assert scan.status_code == 200, scan.text
     scan_id = scan.json()["scan_id"]
 
-    image_one = ("cam_1.png", b"fake-image-bytes-1", "image/png")
-    image_two = ("cam_2.png", b"fake-image-bytes-2", "image/png")
+    image_one = make_sample_image()
+    image_two = make_sample_image(intensity=200)
     upload = client.post(
         f"/projects/{project_id}/scan/{scan_id}/images",
-        files=[("files", image_one), ("files", image_two)],
+        files=[("files", ("cam_1.png", image_one, "image/png")), ("files", ("cam_2.png", image_two, "image/png"))],
     )
     assert upload.status_code == 200, upload.text
 
     complete = client.post(f"/projects/{project_id}/scan/{scan_id}/complete")
     assert complete.status_code == 200, complete.text
-    assert complete.json()["status"] in {"processing", "completed"}
+    payload = complete.json()
+    assert payload["status"] in {"processing", "completed"}
+    assert payload["reconstruction_type"] == "photogrammetry"
 
     status = client.get(f"/projects/{project_id}/scan/{scan_id}")
     assert status.status_code == 200, status.text

@@ -35,7 +35,13 @@ def complete_scan(project_id: str, scan_id: str):
     if scan is None:
         raise HTTPException(status_code=404, detail="Scan not found")
     completed = ScanService().complete_scan(project_id, scan_id)
-    return {"status": completed["status"], "point_cloud_id": completed.get("point_cloud_id"), "mesh_id": completed.get("mesh_id")}
+    return {
+        "status": completed["status"],
+        "reconstruction_type": completed.get("reconstruction_type"),
+        "point_cloud_id": completed.get("point_cloud_id"),
+        "mesh_id": completed.get("mesh_id"),
+        "warnings": completed.get("warnings", []),
+    }
 
 
 @router.get("/projects/{project_id}/scan/{scan_id}")
@@ -47,6 +53,7 @@ def get_scan_status(project_id: str, scan_id: str):
         "status": scan["status"],
         "images_received": scan["images_received"],
         "progress": scan["progress"],
+        "reconstruction_type": scan.get("reconstruction_type"),
         "point_cloud_id": scan.get("point_cloud_id"),
         "mesh_id": scan.get("mesh_id"),
         "warnings": scan.get("warnings", []),
