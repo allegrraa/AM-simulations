@@ -251,6 +251,9 @@ def test_real_fea_and_design_vs_as_built_comparison():
     assert payload["design"]["factor_of_safety"] > 0
     assert payload["design"]["solver_type"] == "linear_elastic_fea"
     assert payload["design"]["element_count"] >= 100
+    surface_displacements = payload["as_built"]["surface_displacements_mm"]
+    assert len(surface_displacements) == asbuilt_resp.json()["geometry_metadata"]["vertex_count"]
+    assert any(np.linalg.norm(displacement) > 0 for displacement in surface_displacements)
 
     higher_load_config = {
         "load_magnitude_n": 200,

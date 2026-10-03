@@ -7,6 +7,7 @@ import numpy as np
 import pyvista as pv
 import tetgen
 import trimesh
+from scipy.spatial import cKDTree
 from skfem import Basis, ElementTetP1, ElementVector, MeshTet, asm, condense, solve
 from skfem.models.elasticity import linear_elasticity
 
@@ -16,6 +17,7 @@ from backend.app.solvers.base import SimulationEngine
 class FiniteElementSolver(SimulationEngine):
     _length_to_meters = {"mm": 1e-3, "cm": 1e-2, "m": 1.0}
     _max_tetrahedra = 100_000
+    _max_surface_field_vertices = 50_000
 
     def _load_surface(self, mesh_path: str) -> trimesh.Trimesh:
         path = Path(mesh_path)
@@ -171,7 +173,7 @@ class FiniteElementSolver(SimulationEngine):
         if overlapping_nodes.size:
             warnings.append("Load nodes on the fixed support were constrained; the total load was redistributed over remaining load nodes.")
 
-        return {
+        result = {
             "max_displacement_mm": round(max_displacement_mm, 6),
             "max_stress_mpa": round(max_stress_pa / 1e6, 6),
             "factor_of_safety": round(yield_strength / max(max_stress_pa, 1e-12), 6),
@@ -183,6 +185,21 @@ class FiniteElementSolver(SimulationEngine):
             "element_count": int(element_count),
             "warnings": warnings,
         }
+
+        if mesh.get("include_surface_displacements"):
+            if len(surface.vertices) > self._max_surface_field_vertices:
+                warnings.append("Surface displacement field omitted because the STL exceeds the viewer vertex limit.")
+            else:
+                surface_points_m = np.asarray(surface.vertices, dtype=float) * length_scale
+                distances, surface_node_indices = cKDTree(coordinates.T).query(surface_points_m, k=1)
+                coordinate_tolerance = max(float(np.ptp(coordinates)) * 1e-8, 1e-10)
+                if np.any(distances > coordinate_tolerance):
+                    warnings.append("Surface displacement field omitted because STL vertices could not be mapped to FEA nodes.")
+                else:
+                    result["surface_vertex_coordinates"] = surface.vertices.astype(float).tolist()
+                    result["surface_displacements_mm"] = (nodal_displacement[:, surface_node_indices].T * 1000).tolist()
+
+        return result
 
 
 def _format_count(value: int) -> str:

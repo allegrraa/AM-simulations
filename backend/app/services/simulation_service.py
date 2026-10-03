@@ -23,6 +23,7 @@ class SimulationService:
             "bounding_box": geometry.get("bounding_box", []),
             "vertex_count": int(geometry.get("vertex_count", 100)),
             "face_count": int(geometry.get("face_count", 200)),
+            "include_surface_displacements": not design,
         }, material, config)
         return simulation
 
