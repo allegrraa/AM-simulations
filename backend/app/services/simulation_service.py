@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, Tuple
 
-from backend.app.solvers.mock_solver import MockSimulationEngine
+from backend.app.solvers.finite_element_solver import FiniteElementSolver
 
 
 class SimulationService:
     def __init__(self, solver=None):
-        self.solver = solver or MockSimulationEngine()
+        self.solver = solver or FiniteElementSolver()
 
     def run(self, project_id: str, project: Dict[str, Any], *, design: bool = True) -> Dict[str, Any]:
         mesh_info = project.get("design_model") if design else project.get("as_built_model")
@@ -20,6 +20,7 @@ class SimulationService:
         simulation = self.solver.run_simulation({
             "mesh_path": mesh_info,
             "volume": float(geometry.get("volume", 1.0)),
+            "bounding_box": geometry.get("bounding_box", []),
             "vertex_count": int(geometry.get("vertex_count", 100)),
             "face_count": int(geometry.get("face_count", 200)),
         }, material, config)

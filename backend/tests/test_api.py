@@ -2,6 +2,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import trimesh
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
@@ -9,38 +10,8 @@ from backend.app.main import app
 client = TestClient(app)
 
 
-def create_stl_text():
-    return """solid cube
-  facet normal 0 0 1
-    outer loop
-      vertex 0 0 0
-      vertex 1 0 0
-      vertex 0 1 0
-    endloop
-  endfacet
-  facet normal 0 0 1
-    outer loop
-      vertex 0 1 0
-      vertex 1 0 0
-      vertex 1 1 0
-    endloop
-  endfacet
-  facet normal 0 0 -1
-    outer loop
-      vertex 0 0 0
-      vertex 0 1 0
-      vertex 1 0 0
-    endloop
-  endfacet
-  facet normal 0 0 -1
-    outer loop
-      vertex 0 1 0
-      vertex 1 1 0
-      vertex 1 0 0
-    endloop
-  endfacet
-endsolid cube
-"""
+def create_stl_text(extents=(30, 20, 12)):
+        return trimesh.exchange.stl.export_stl_ascii(trimesh.creation.box(extents=extents))
 
 
 def create_ply_text():
@@ -95,9 +66,14 @@ def make_sample_image(width=120, height=120, intensity=180):
     return buffer.tobytes()
 
 
-def test_scan_workflow_and_mock_reconstruction():
+def test_scan_workflow_and_fea_rejects_open_photo_mesh():
     project = client.post("/projects", json={"name": "Scan Test"}).json()
     project_id = project["project_id"]
+    design = client.post(
+        f"/projects/{project_id}/design",
+        files={"file": ("design.stl", create_stl_text().encode("utf-8"), "model/stl")},
+    )
+    assert design.status_code == 200, design.text
 
     scan = client.post(f"/projects/{project_id}/scan", json={"source": "phone"})
     assert scan.status_code == 200, scan.text
@@ -122,6 +98,42 @@ def test_scan_workflow_and_mock_reconstruction():
     payload = status.json()
     assert payload["images_received"] >= 2
     assert payload["mesh_id"]
+    mesh_download = client.get(f"/projects/{project_id}/scan/{scan_id}/mesh")
+    assert mesh_download.status_code == 200, mesh_download.text
+    assert mesh_download.content.startswith(b"solid photogrammetry_mesh")
+
+    material_payload = {
+        "design": {
+            "material_name": "PLA nominal",
+            "young_modulus_pa": 3.5e9,
+            "poisson_ratio": 0.36,
+            "density_kg_m3": 1240,
+            "yield_strength_pa": 50e6,
+        },
+        "as_built": {
+            "material_name": "PLA as-built",
+            "young_modulus_pa": 2.8e9,
+            "poisson_ratio": 0.36,
+            "density_kg_m3": 1120,
+            "yield_strength_pa": 42e6,
+        },
+    }
+    materials = client.put(f"/projects/{project_id}/materials", json=material_payload)
+    assert materials.status_code == 200, materials.text
+    config = client.post(
+        f"/projects/{project_id}/simulation-config",
+        json={
+            "load_magnitude_n": 100,
+            "load_direction": [0, -1, 0],
+            "support_region": {"axis": "x", "side": "min", "percent": 0.1},
+            "load_region": {"axis": "x", "side": "max", "percent": 0.1},
+            "simulation_type": "static_structural",
+        },
+    )
+    assert config.status_code == 200, config.text
+    simulation = client.post(f"/projects/{project_id}/simulate")
+    assert simulation.status_code == 422, simulation.text
+    assert "watertight" in simulation.json()["detail"]
 
 
 def test_asbuilt_pointcloud_and_mesh_upload():
@@ -174,7 +186,7 @@ def test_materials_and_simulation_config():
         "load_magnitude_n": 100,
         "load_direction": [0, -1, 0],
         "support_region": {"axis": "x", "side": "min", "percent": 0.1},
-        "load_region": {"axis": "x", "side": "max", "percent": 0.1},
+        "load_region": {"axis": "y", "side": "max", "percent": 0.1},
         "simulation_type": "static_structural",
     }
     response = client.post(f"/projects/{project_id}/simulation-config", json=config)
@@ -182,7 +194,7 @@ def test_materials_and_simulation_config():
     assert response.json()["load_magnitude_n"] == 100
 
 
-def test_mock_simulation_and_design_vs_as_built_comparison():
+def test_real_fea_and_design_vs_as_built_comparison():
     project = client.post("/projects", json={"name": "Simulation Test"}).json()
     project_id = project["project_id"]
 
@@ -194,7 +206,7 @@ def test_mock_simulation_and_design_vs_as_built_comparison():
 
     asbuilt_resp = client.post(
         f"/projects/{project_id}/asbuilt/mesh",
-        files={"file": ("as_built.stl", create_stl_text().encode("utf-8"), "model/stl")},
+        files={"file": ("as_built.stl", create_stl_text((28, 19, 10)).encode("utf-8"), "model/stl")},
     )
     assert asbuilt_resp.status_code == 200
 
@@ -235,7 +247,22 @@ def test_mock_simulation_and_design_vs_as_built_comparison():
     assert "design" in payload
     assert "as_built" in payload
     assert "comparison" in payload
+    assert payload["design"]["max_stress_mpa"] > 0
     assert payload["design"]["factor_of_safety"] > 0
+    assert payload["design"]["solver_type"] == "linear_elastic_fea"
+    assert payload["design"]["element_count"] >= 100
+
+    higher_load_config = {
+        "load_magnitude_n": 200,
+        "load_direction": [0, -1, 0],
+        "support_region": {"axis": "x", "side": "min", "percent": 0.1},
+        "load_region": {"axis": "y", "side": "max", "percent": 0.1},
+        "simulation_type": "static_structural",
+    }
+    client.post(f"/projects/{project_id}/simulation-config", json=higher_load_config)
+    higher_load = client.post(f"/projects/{project_id}/simulate")
+    assert higher_load.status_code == 200, higher_load.text
+    assert higher_load.json()["design"]["max_stress_mpa"] > payload["design"]["max_stress_mpa"]
 
 
 def test_ai_analysis():

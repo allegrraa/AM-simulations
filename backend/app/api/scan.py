@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
 from backend.app.services.project_store import get_project, get_scan
 from backend.app.services.scan_service import ScanService
+from backend.app.storage.file_storage import get_project_dir
 
 router = APIRouter()
 
@@ -58,3 +61,21 @@ def get_scan_status(project_id: str, scan_id: str):
         "mesh_id": scan.get("mesh_id"),
         "warnings": scan.get("warnings", []),
     }
+
+
+@router.get("/projects/{project_id}/scan/{scan_id}/mesh")
+def download_scan_mesh(project_id: str, scan_id: str):
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    scan = get_scan(project_id, scan_id)
+    if scan is None or not scan.get("mesh_id"):
+        raise HTTPException(status_code=404, detail="Reconstructed mesh not found")
+
+    mesh_name = scan["mesh_id"]
+    if Path(mesh_name).name != mesh_name:
+        raise HTTPException(status_code=404, detail="Reconstructed mesh not found")
+    project_dir = get_project_dir(project_id).resolve()
+    mesh_path = (project_dir / mesh_name).resolve()
+    if mesh_path.parent != project_dir or not mesh_path.is_file():
+        raise HTTPException(status_code=404, detail="Reconstructed mesh not found")
+    return FileResponse(mesh_path, media_type="model/stl", filename=mesh_name)

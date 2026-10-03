@@ -22,8 +22,10 @@ uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 - scan workflow that processes actual uploaded camera images using an OpenCV-based photogrammetry-style pipeline
 - as-built point cloud and mesh upload
 - materials and simulation config endpoints
-- deterministic mock structural comparison
+- 3D linear-elastic tetrahedral FEA for closed, watertight STL solids
 - AI analysis endpoint that explains simulation outputs without inventing physics results
 
 ## Notes
 This project now performs a lightweight image-derived reconstruction from uploaded scan photos: each image is read, evaluated for focus quality, converted into a pseudo-3D point cloud, and exported as a PLY point cloud plus STL mesh. The downstream comparison and simulation logic stays unchanged so a real photogrammetry or metrology stack can be swapped in later without breaking the API.
+
+The FEA solver requires watertight solid meshes and an explicit STL length unit (default: mm). The current image-derived scan mesh is open and unscaled, so it is deliberately rejected by FEA until a physically valid reconstruction pipeline is connected. Results use small-strain linear elasticity and are not certified engineering advice.

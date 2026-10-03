@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -10,6 +10,7 @@ class SimulationConfig(BaseModel):
     load_direction: List[float] = Field(default_factory=lambda: [0.0, -1.0, 0.0])
     load_region: Dict[str, Any] = Field(default_factory=lambda: {"axis": "x", "side": "max", "percent": 0.1})
     support_region: Dict[str, Any] = Field(default_factory=lambda: {"axis": "x", "side": "min", "percent": 0.1})
+    length_unit: Literal["mm", "cm", "m"] = "mm"
     simulation_type: str = "static_structural"
 
 
@@ -20,7 +21,9 @@ class SimulationResult(BaseModel):
     max_stress_location: Optional[List[float]] = None
     max_displacement_location: Optional[List[float]] = None
     solver_status: str = "completed"
-    solver_type: str = "mock"
+    solver_type: str = "linear_elastic_fea"
+    node_count: Optional[int] = None
+    element_count: Optional[int] = None
     warnings: List[str] = Field(default_factory=list)
 
 

@@ -1,6 +1,6 @@
 # AM Simulations Backend
 
-This backend is a weekend MVP for an additive-manufacturing comparison platform. It accepts design and as-built geometry, simulates performance using deterministic mock results, and exposes structured APIs for the frontend workflow.
+This backend is an additive-manufacturing comparison MVP. It accepts design and as-built geometry, runs linear-elastic tetrahedral finite-element analysis on valid solid meshes, and exposes structured APIs for the frontend workflow.
 
 ## Architecture
 
@@ -47,6 +47,7 @@ uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 - `POST /projects/{project_id}/scan/{scan_id}/images`
 - `POST /projects/{project_id}/scan/{scan_id}/complete`
 - `GET /projects/{project_id}/scan/{scan_id}`
+- `GET /projects/{project_id}/scan/{scan_id}/mesh`
 - `POST /projects/{project_id}/asbuilt/pointcloud`
 - `POST /projects/{project_id}/asbuilt/mesh`
 - `POST /projects/{project_id}/compare`
@@ -64,14 +65,15 @@ The system distinguishes between:
 
 This allows the backend to keep the photo-to-scan pipeline independent from downstream simulation logic.
 
-## Mocked behavior
+## Current constraints
 
-The current backend intentionally marks the following as mocked or placeholder data:
+The current backend has these non-production constraints:
 
-- reconstruction engine output is deterministic and labeled as `mock`
-- material properties may be user-entered or mocked
-- simulation results are not certified FEA results
-- AI answers rely on deterministic engineering summaries and never invent physics values
+- photo reconstruction is image-derived pseudo-3D, not calibrated photogrammetry
+- the generated scan mesh is open and unscaled, so the FEA solver returns HTTP 422 for it
+- material properties are user-entered assumptions
+- static linear-elastic results require a watertight STL and an accurate unit selection; results are not certified engineering advice
+- AI answers rely on available geometry/simulation summaries and never invent physics values
 
 ## Adding real photogrammetry
 
@@ -83,11 +85,11 @@ Uploaded point clouds or STL meshes fit the same downstream process. The API acc
 
 ## Adding real FEA
 
-The solver abstraction in `backend/app/solvers/base.py` supports replacement with CalculiX, FEniCS, or another solver behind the same interface.
+The default solver in `backend/app/solvers/finite_element_solver.py` tetrahedralizes watertight STL solids with TetGen and assembles a 3D linear-elastic system with scikit-fem. It applies fixed-face constraints and distributed nodal loads, and reports maximum displacement, von Mises stress, and yield-based factor of safety. It is a small-strain static analysis, not nonlinear, fatigue, thermal, or certified analysis.
 
 ## Current limitations
 
-- No real finite-element calculation
+- Photo-generated as-built geometry is not yet suitable for FEA
 - No production photogrammetry pipeline yet
 - No persisted database beyond in-memory project state
 - Geometry alignment is intentionally lightweight for MVP purposes

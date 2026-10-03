@@ -32,8 +32,11 @@ def run_simulation(project_id: str):
         raise HTTPException(status_code=400, detail="Simulation configuration is required")
 
     service = SimulationService()
-    design_result = service.run(project_id, project, design=True)
-    as_built_result = service.run(project_id, project, design=False)
+    try:
+        design_result = service.run(project_id, project, design=True)
+        as_built_result = service.run(project_id, project, design=False)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     comparison = ComparisonService().compare_simulation_results(design_result, as_built_result)
     payload = {
         "design": design_result,

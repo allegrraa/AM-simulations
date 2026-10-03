@@ -6,9 +6,10 @@ from typing import Any, Dict, List
 
 from fastapi import UploadFile
 
+from backend.app.services.geometry_service import parse_stl_mesh
 from backend.app.services.project_store import add_scan, get_project, get_scan, update_project
 from backend.app.services.reconstruction_service import ReconstructionService
-from backend.app.storage.file_storage import save_uploaded_file
+from backend.app.storage.file_storage import get_project_dir, save_uploaded_file
 
 
 class ScanService:
@@ -62,7 +63,16 @@ class ScanService:
         scan["point_cloud_id"] = result["point_cloud_id"]
         scan["mesh_id"] = result["mesh_id"]
         scan["progress"] = 1.0
-        update_project(project_id, as_built_model=result["mesh_id"])
+        mesh_path = (get_project_dir(project_id) / result["mesh_id"]).resolve()
+        mesh_metadata = parse_stl_mesh(mesh_path, source_type="image_derived_mesh").model_dump()
+        project = get_project(project_id)
+        geometry_metadata = project.get("geometry_metadata", {})
+        geometry_metadata["as_built"] = mesh_metadata
+        update_project(
+            project_id,
+            as_built_model=str(mesh_path),
+            geometry_metadata=geometry_metadata,
+        )
         return scan
 
     def get_scan_status(self, project_id: str, scan_id: str) -> Dict[str, Any]:
