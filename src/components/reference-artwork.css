@@ -1,0 +1,6 @@
+.app-shell,.landing-shell { position:relative; isolation:isolate; }
+.reference-artwork { position:fixed; inset:0; z-index:-1; overflow:hidden; pointer-events:none; }
+.reference-artwork canvas { position:absolute; width:110%; height:126%; left:-5%; top:-8%; pointer-events:none; }
+/* Artwork continues behind type and the transparent model canvas. Dense data stays readable. */
+.geometry-panel,.material-columns,.result-summary,.results-lower-grid,.engineering-table { background:#fff; }
+@media(prefers-reduced-motion:reduce) { .reference-artwork { animation:none; transition:none; } }

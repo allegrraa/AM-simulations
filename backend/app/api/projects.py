@@ -5,9 +5,17 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from backend.app.models.project import ProjectCreate, ProjectRecordModel, ProjectResponse
 from backend.app.services.geometry_service import parse_stl_mesh
 from backend.app.services.project_store import create_project, get_project, update_project
-from backend.app.storage.file_storage import save_uploaded_file
+from backend.app.storage.file_storage import save_uploaded_file, stored_mesh_response
 
 router = APIRouter()
+
+
+@router.get("/projects/{project_id}/design/mesh")
+def download_design_mesh(project_id: str):
+    project = get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return stored_mesh_response(project_id, project.get("design_model"))
 
 
 @router.post("/projects", response_model=ProjectResponse)

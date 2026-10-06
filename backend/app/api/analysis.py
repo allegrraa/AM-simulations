@@ -16,6 +16,8 @@ def ask_question(project_id: str, payload: dict):
     question = payload.get("question", "")
     if not question:
         raise HTTPException(status_code=400, detail="Question is required")
+    if not project.get("last_simulation"):
+        raise HTTPException(status_code=400, detail="Run a simulation before requesting an engineering summary")
     result = AnalysisService().analyze(project, question)
     project.setdefault("analysis_history", []).append({"question": question, "answer": result["answer"]})
     update_project(project_id, analysis_history=project["analysis_history"])

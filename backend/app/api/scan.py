@@ -37,7 +37,11 @@ def complete_scan(project_id: str, scan_id: str):
     scan = get_scan(project_id, scan_id)
     if scan is None:
         raise HTTPException(status_code=404, detail="Scan not found")
-    completed = ScanService().complete_scan(project_id, scan_id)
+    try:
+        completed = ScanService().complete_scan(project_id, scan_id)
+    except ValueError as exc:
+        scan["status"] = "failed"
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {
         "status": completed["status"],
         "reconstruction_type": completed.get("reconstruction_type"),

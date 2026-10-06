@@ -3,7 +3,13 @@ node_modules/
 __pycache__/
 .venv/
 .env
+.env.*
+!.env.example
+!.env.*.example
 *.log
 backend/uploads/
 .pytest_cache/
 *.pyc
+src/dist/
+/_skipped.face
+/_skipped.node

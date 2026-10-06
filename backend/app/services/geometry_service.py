@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import trimesh
+from fastapi import HTTPException
 
 from backend.app.models.geometry import AlignmentResult, GeometryComparison, GeometryMetadata
 
@@ -18,7 +19,12 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 
 
 def parse_stl_mesh(path: str | Path, source_type: str = "uploaded_stl") -> GeometryMetadata:
-    mesh = trimesh.load_mesh(str(path), force="mesh")
+    try:
+        mesh = trimesh.load_mesh(str(path), force="mesh")
+        if not isinstance(mesh, trimesh.Trimesh) or mesh.is_empty or not np.isfinite(mesh.vertices).all():
+            raise ValueError("Empty or non-finite mesh")
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="Invalid STL: upload a non-empty triangular mesh.") from exc
     bbox = mesh.bounding_box.extents.tolist()
     dims = {
         "x_mm": _safe_float(bbox[0]),
@@ -73,8 +79,8 @@ def parse_point_cloud(path: str | Path) -> Dict[str, Any]:
                     continue
         points = np.asarray(parsed_points, dtype=float)
 
-    if len(points) == 0:
-        raise ValueError("Point cloud is empty or unsupported")
+    if len(points) == 0 or not np.isfinite(points).all():
+        raise HTTPException(status_code=422, detail="Point cloud is empty or unsupported; use finite ASCII PLY points.")
 
     centroid = points.mean(axis=0)
     bbox = np.ptp(points, axis=0)
@@ -111,6 +117,8 @@ def estimate_alignment(design_path: str | Path, as_built_path: str | Path) -> Al
 def compare_geometry(design_path: str | Path, as_built_path: str | Path) -> GeometryComparison:
     design_mesh = trimesh.load_mesh(str(design_path), force="mesh")
     built_mesh = trimesh.load_mesh(str(as_built_path), force="mesh")
+    if not isinstance(design_mesh, trimesh.Trimesh) or not isinstance(built_mesh, trimesh.Trimesh):
+        raise HTTPException(status_code=422, detail="Geometry comparison requires two triangular meshes; upload an as-built STL.")
     volume_diff = 0.0
     if design_mesh.volume > 0:
         volume_diff = ((built_mesh.volume - design_mesh.volume) / design_mesh.volume) * 100.0

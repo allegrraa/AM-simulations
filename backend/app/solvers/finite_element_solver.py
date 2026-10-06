@@ -146,7 +146,7 @@ class FiniteElementSolver(SimulationEngine):
         nodal_displacement = displacement_solution[basis.nodal_dofs]
         displacement_magnitude = np.linalg.norm(nodal_displacement, axis=0)
         max_displacement_node = int(np.argmax(displacement_magnitude))
-        max_displacement_mm = float(displacement_magnitude[max_displacement_node] / length_scale)
+        max_displacement_mm = float(displacement_magnitude[max_displacement_node] * 1000)
 
         element_nodes = volume_mesh.t
         element_count = element_nodes.shape[1]
@@ -163,8 +163,8 @@ class FiniteElementSolver(SimulationEngine):
         von_mises = np.sqrt(1.5 * np.einsum("eij,eij->e", deviatoric_stress, deviatoric_stress))
         max_stress_element = int(np.argmax(von_mises))
         max_stress_pa = float(von_mises[max_stress_element])
-        stress_location_mm = coordinates[:, element_nodes[:, max_stress_element]].mean(axis=1) / length_scale
-        displacement_location_mm = coordinates[:, max_displacement_node] / length_scale
+        stress_location_mm = coordinates[:, element_nodes[:, max_stress_element]].mean(axis=1) * 1000
+        displacement_location_mm = coordinates[:, max_displacement_node] * 1000
 
         warnings = [
             "3D small-strain isotropic linear-elastic tetrahedral FEA; STL units were interpreted from the selected project setting.",
@@ -196,7 +196,7 @@ class FiniteElementSolver(SimulationEngine):
                 if np.any(distances > coordinate_tolerance):
                     warnings.append("Surface displacement field omitted because STL vertices could not be mapped to FEA nodes.")
                 else:
-                    result["surface_vertex_coordinates"] = surface.vertices.astype(float).tolist()
+                    result["surface_vertex_coordinates"] = (surface.vertices.astype(float) * length_scale * 1000).tolist()
                     result["surface_displacements_mm"] = (nodal_displacement[:, surface_node_indices].T * 1000).tolist()
 
         return result

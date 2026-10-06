@@ -13,10 +13,10 @@ class AnalysisService:
         built_factor = float(as_built.get("factor_of_safety", 1.0))
         survive = built_factor > 1.0
         answer = (
-            f"The manufactured part is predicted to {'survive' if survive else 'not survive'} the specified load "
-            f"under the current deterministic model. The factor of safety decreases from {design_factor:.2f} to {built_factor:.2f}. "
+            f"The manufactured model {'remains below' if survive else 'reaches or exceeds'} the entered yield strength "
+            f"under the configured static load. The factor of safety changes from {design_factor:.2f} to {built_factor:.2f}. "
             f"Displacement changes by {comparison.get('displacement_change_percent', 0.0):.1f}% and stress changes by {comparison.get('stress_change_percent', 0.0):.1f}%. "
-            f"The current result uses mock material measurements and should not be treated as physical certification."
+            f"Material properties are user-entered assumptions. Review mesh convergence and boundary conditions before engineering use. This is not certification."
         )
         return {
             "question": question,
@@ -27,6 +27,6 @@ class AnalysisService:
                 "factor_of_safety_as_built": built_factor,
                 "stress_increase_percent": comparison.get("stress_change_percent", 0.0),
                 "displacement_increase_percent": comparison.get("displacement_change_percent", 0.0),
-                "warnings": ["Mock data remains in use for the demo."],
+                "warnings": list(dict.fromkeys(design.get("warnings", []) + as_built.get("warnings", []))),
             },
         }

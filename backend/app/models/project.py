@@ -28,3 +28,7 @@ class ProjectRecordModel(BaseModel):
     simulation_config: Optional[Dict[str, Any]] = None
     last_simulation: Optional[Dict[str, Any]] = None
     analysis_history: List[Dict[str, Any]] = Field(default_factory=list)
+    design_model_name: Optional[str] = None
+    as_built_model_name: Optional[str] = None
+    geometry_metadata: Dict[str, Any] = Field(default_factory=dict)
+    geometry_comparison: Optional[Dict[str, Any]] = None

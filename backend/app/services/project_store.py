@@ -38,6 +38,11 @@ def update_project(project_id: str, **kwargs: Any) -> Dict[str, Any]:
     if project is None:
         raise KeyError(f"Project {project_id} does not exist")
     project.update(kwargs)
+    if any(key in kwargs for key in ("design_model", "as_built_model", "materials", "simulation_config")):
+        project["last_simulation"] = None
+        project["analysis_history"] = []
+    if any(key in kwargs for key in ("design_model", "as_built_model")):
+        project.pop("geometry_comparison", None)
     return project
 
 
